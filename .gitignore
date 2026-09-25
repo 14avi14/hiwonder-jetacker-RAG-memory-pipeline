@@ -1,0 +1,9 @@
+__pycache__/
+
+env/
+
+.env
+*.env
+
+# Ignore the pickle files(RAG memory) for now
+*.pkl
