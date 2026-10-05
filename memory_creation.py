@@ -45,12 +45,20 @@ headers = {
 }
 MODEL = "qwen/qwen3.8-27b"
 
-CAPTIONING_PROMPT = """You are making descriptions for a scene to be stored
-in a RAG based search system database for navigaton. Use the images to output
-ONE caption of all landmarks, objects, logos, words,
-actions, etc. in the images(1-2 SENTENCES ONLY).
-Use identifying adjectives(e.g. color, size, distance from camera etc.)
-that are useful.
+CAPTIONING_PROMPT = """You are a vision-language model generating scene
+descriptions for a RAG-based navigation database. 
+
+Analyze the provided sequence of 1 to 6 video frames and output a SINGLE
+caption (strictly 1-2 sentences total) summarizing the key landmarks,
+objects, logos, visible text, and actions across the frames.
+
+Guidelines:
+- Describe the progression or spatial relationship of objects (e.g.,
+  getting closer to an object) if multiple frames show movement.
+- Include essential identifying details such as base colors (e.g., red,
+  blue) and relative size or position.
+- Keep the output concise, dense with navigation-relevant landmarks, and
+  strictly within the 1-2 sentence limit.
 """
 
 MOCK_CAPTIONS = [
@@ -89,7 +97,7 @@ def get_caption(video):
         # return default caption
         return random.choice(MOCK_CAPTIONS)
 
-    # Will either process one vidoe, or multiple images, depends on API
+    # Will either process one video, or multiple images, depends on API
     # availability
     if SEND_VIDEO_FORM:
         video_input = [{
@@ -126,20 +134,18 @@ def get_caption(video):
 
     print("[memory_creation.py - get_caption(vid)]")
     response = requests.post(url=URL, headers=headers, json=payload)
-    print(f"API RESPONSE:")
-    pprint.pprint(response.json())
     
     response_json = response.json()
     if "error" in response_json:
         print("-" * 25 + " API Response Error " + "-" * 25)
         text = None
+        pprint.pprint(response_json)
     else:
         text = response_json["choices"][0]["message"]["content"]
-        print("RESPONSE TEXT:", text)
+        
     return text
 
 def memorize(frames, car_states, timestamps, vec_db, max_frames_per):
-    captions = []
     for i in range(0, len(frames), max_frames_per):
         video_frames = frames[i:i+max_frames_per]
         if SEND_VIDEO_FORM:
@@ -154,27 +160,26 @@ def memorize(frames, car_states, timestamps, vec_db, max_frames_per):
         caption = get_caption(full_video_url)
         try:
             while caption is None:
-                print("Trying again after 35 seconds...")
-                time.sleep(35)
+                print("Trying again after 60 seconds. Press CTRL+C to stop.")
+                print("Data already processed will still be saved.")
+                time.sleep(60)
                 caption = get_caption(full_video_url)
-                #request_again = input("Try again(y/n)?: ")
-                #if request_again.lower() == "y":
-                #    caption = get_caption(full_video_url)
-                #else:
-                #    print("Discontinuing...(Memory that has already been processed will be saved)")
-                #    return
         except KeyboardInterrupt:
             print(f"----- DISCONTINUING MEMORY PROCESSING -----")
             return
 
-        captions.append(caption)
+        # Only relevant if video form is being sent
         if os.path.isfile(TEMP_VID_FILENAME):
             os.remove(TEMP_VID_FILENAME) # Not sure if this will help with latency at all
 
         # Insert into memory
+        timestamp_str =  time.strftime("%H:%M:%S %D/%M/%Y", time.localtime(timestamps[i]))
         docs = [{
             "text": caption, "location": car_states[i]["position_xy"],
-            "heading_deg": car_states[i]["heading_deg"], "timestamp": timestamps[i]
-            } for i in range(len(captions))]
+            "heading_deg": car_states[i]["heading_deg"], "timestamp": timestamp,
+            "timestamp_str": timestamp_str
+            }]
+        print("FINAL INSERT:")
+        pprint.pprint(docs)
         vec_db.insert(docs)
 
