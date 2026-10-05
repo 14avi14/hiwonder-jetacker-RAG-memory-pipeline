@@ -29,27 +29,44 @@ headers = {
 }
 MODEL = "openai/gpt-oss-120b"
 
-SEMANTIC_SEARCH_SYSTEM_PROMPT = """You are part of a RAG pipeline. The database
-ONLY CONTAINS VISUAL INFORMATION(summaries of images), so object names,
-logos/brands, size cues, etc. will be necessary to reference. 
-Output 1 short but specific prompt in order to search the RAG database.
-Output VALID JSON IN EXACTLY THIS FORMAT
-{"prompts": [<str>]}."""
-CONTEXT_SYSTEM_PROMPT = """You are part of a memory navigation pipeline.
-Using the data from the user, output a concise, 1 sentence context that
-can help answer the query. Give exact coordinates, headings, and timestamps
-whenever possible and useful. BE CONCISE AND ONLY INCLUDE RELEVANT INFO"""
-FINAL_POSITION_PROMPT = """You are the final part of a RAG navigation
-pipeline. Use the user's context to output the exact coordinates that the
-robot should go to or null if not enough information. Also, output reasoning.
-If the inquerier does not explicitly say to be led somewhere, leave out
-"goal_pose", and simply put the answer requested in "reasoning"
-USE THIS EXACT JSON FORMAT, NOTHING ELSE, ONLY VALID JSON:
+SEMANTIC_SEARCH_SYSTEM_PROMPT = """You are a search query generator for
+a vision-only RAG pipeline. The database contains image summaries
+featuring object names, logos, brands, colors, and spatial size cues.
+
+Task:
+Convert the user's request into 1 short, highly specific search prompt
+optimized to query this visual database.
+
+Output format:
+Return ONLY valid JSON with no markdown wrapping or extra text, strictly
+in this format:
+{"prompts": ["<search_query_string>"]}"""
+CONTEXT_SYSTEM_PROMPT = """You are a memory navigation context synthesizer.
+Analyze the user's data and output a strictly 1-sentence context snippet
+to answer the query. 
+
+Guidelines:
+- Include exact coordinates, headings, and timestamps whenever available
+  and relevant.
+- Be extremely concise; omit all unnecessary filler words.
+- Focus purely on actionable navigation data."""
+FINAL_POSITION_PROMPT = """You are the final decision-maker in a robot
+navigation RAG pipeline. Analyze the user's context to determine the
+final target position and reasoning.
+
+Rules:
+- If the user explicitly asks to be led or navigated somewhere, include
+  the `goal_pose` as `[x, y, heading_degrees]`. Heading must be between -180 and 180.
+- If the user does NOT explicitly ask to be led/navigated somewhere, set
+  `goal_pose` to `null` and put the requested answer inside `reasoning`.
+
+Output format:
+Return ONLY valid JSON matching this exact schema, with no markdown or
+extra text:
 {
-    "goal_pose": [x, y, <heading degrees (-180, 180)>] or nothing,
-    "reasoning": <str>
-}
-"""
+    "goal_pose": [0.0, 0.0, 0] or null,
+    "reasoning": "<string explanation>"
+}"""
 
 FINAL_OUTPUT_SCHEMA = {
     "type": "json_schema",
